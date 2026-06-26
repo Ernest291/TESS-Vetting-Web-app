@@ -33,7 +33,11 @@ with st.sidebar:
         tic_id = st.number_input(label="TIC ID: ", format="%.0f")
         sector = st.number_input(label="Sector: ", format="%.0f")
         transit_time = st.number_input(label="Transit Time: ")
-        bg_flux = st.checkbox(label="check bg flux?")
+        bg_flux = st.checkbox(label="check bg flux?") 
+        centroid_plot = st.checkbox(label="check Centroid Plot?")
+        in_out_transit_diff = st.checkbox(label="check In-Out Transit difference image?")
+        pixel_level = st.checkbox(label="check Pixel-Level Plot?")
+
         submitted = st.form_submit_button()
 
 if submitted:
@@ -91,8 +95,11 @@ if submitted:
             st.plotly_chart(fig1, use_container_width=True)
         else:
             st.error("No Lightcurve data found.")
+#-------------------------------------------------------------------------------------------------
+#                                       VETTING TESTS
+#-------------------------------------------------------------------------------------------------
 
-        # Background Flux section
+# Background Flux section
         if bg_flux:
             st.divider()
             st.write("### Vetting Tests")
@@ -144,3 +151,11 @@ if submitted:
                 st.plotly_chart(fig2, use_container_width=True)
             else:
                 st.error("No available bg flux data to show.")
+            
+#
+            if in_out_transit_diff:
+                st.divider()
+                st.write("Work in Progress")
+
+
+
