@@ -2,6 +2,8 @@ import streamlit as st
 import lightkurve as lk
 import plotly.graph_objects as go
 import pandas as pd
+import matplotlib.pyplot as plt
+
 
 # 1. Cache data
 
@@ -26,16 +28,44 @@ def get_background_data(tic_id, sector):
     return df.dropna()
 
 
+@st.cache_data(show_spinner="Preparing centroids...")
+def get_centroid_data(tic_id, sector):
+    lc = lk.search_lightcurve(f"TIC {int(tic_id)}", sector=int(sector)).download()
+    if lc is None:
+        return None
+    lc = lc.normalize()
+    df_centroid_x_b = pd.DataFrame(
+        {"time": lc.time.value, "centroid_x_b": lc.mom_centr2.value}
+    )  # Centroid for x/brightness
+    df_centroid_x_s = pd.DataFrame(
+        {"time": lc.time.value, "centroid_x_s": lc.pos_corr2.value}
+    )  # Centroid for x/satellite motion
+    df_centroid_y_b = pd.DataFrame(
+        {"time": lc.time.value, "centroid_y_b": lc.mom_centr1.value}
+    )  # Centroid for y/brightness
+    df_centroid_y_s = pd.DataFrame(
+        {"time": lc.time.value, "centroid_y_s": lc.pos_corr1.value}
+    )  # Centroid for y/satellite motion
+    return (
+        df_centroid_x_b.dropna(),
+        df_centroid_x_s.dropna(),
+        df_centroid_y_b.dropna(),
+        df_centroid_y_s.dropna(),
+    )
+
+
 # 2. streamlit layout
 
 with st.sidebar:
-    with st.form(key="input"):
+    with st.form(key="sidebar_input"):
         tic_id = st.number_input(label="TIC ID: ", format="%.0f")
         sector = st.number_input(label="Sector: ", format="%.0f")
         transit_time = st.number_input(label="Transit Time: ")
-        bg_flux = st.checkbox(label="check bg flux?") 
+        bg_flux = st.checkbox(label="check bg flux?")
         centroid_plot = st.checkbox(label="check Centroid Plot?")
-        in_out_transit_diff = st.checkbox(label="check In-Out Transit difference image?")
+        in_out_transit_diff = st.checkbox(
+            label="check In-Out Transit difference image?"
+        )
         pixel_level = st.checkbox(label="check Pixel-Level Plot?")
 
         submitted = st.form_submit_button()
@@ -95,11 +125,11 @@ if submitted:
             st.plotly_chart(fig1, use_container_width=True)
         else:
             st.error("No Lightcurve data found.")
-#-------------------------------------------------------------------------------------------------
-#                                       VETTING TESTS
-#-------------------------------------------------------------------------------------------------
+        # -------------------------------------------------------------------------------------------------
+        #                                       VETTING TESTS
+        # -------------------------------------------------------------------------------------------------
 
-# Background Flux section
+        # Background Flux section--------------------------------------------------------------------------
         if bg_flux:
             st.divider()
             st.write("### Vetting Tests")
@@ -151,11 +181,56 @@ if submitted:
                 st.plotly_chart(fig2, use_container_width=True)
             else:
                 st.error("No available bg flux data to show.")
-            
-#
+
+            # Centroid Positions ------------------------------------------------------------------------------
+
+            if centroid_plot:
+                st.divider()
+                st.write("Centroid Plot should be here once construction is finished!")
+                st.write("Will fix some bugs soon!")
+                cs = get_centroid_data(tic_id, sector)
+                if cs is not None:
+                    st.write("test success!")
+                    cxb = cs[0]
+                    cxs = cs[1]
+                    cyb = cs[2]
+                    cys = cs[3]
+
+                    fig3 = go.Figure()
+                    fig3.add_trace(
+                        go.Scattergl(
+                            x=cs[0]["time"],
+                            y=cs[0]["centroid_x_b"],
+                            mode="markers",
+                            marker=dict(color="orange", symbol="star", size=6),
+                            name="brightness",
+                        )
+                    )
+
+                    fig3.add_trace(
+                        go.Scattergl(
+                            x=cs[1]["time"],
+                            y=cs[1]["centroid_x_s"],
+                            mode="markers",
+                            marker=dict(color="white", symbol="star", size=6),
+                            name="satellite motion",
+                        )
+                    )
+
+                    fig3.update_layout(
+                        title=f"TIC {int(tic_id)} Centroid Plot (x-axis)",
+                        yaxis_title="Centroid Positions (x-axis)",
+                        xaxis_title="Time (BTJD)",
+                        template="plotly_dark",
+                        font=dict(size=18),
+                    )
+
+                    st.plotly_chart(fig3, use_container_width=True)
+                else:
+                    st.write("debug it!")
+
+            # In-Out Transit difference -----------------------------------------------------------------------
+
             if in_out_transit_diff:
                 st.divider()
                 st.write("Work in Progress")
-
-
-
