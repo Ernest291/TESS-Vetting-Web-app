@@ -211,8 +211,8 @@ if submitted:
                         go.Scattergl(
                             x=cs[1]["time"],
                             y=cs[1]["centroid_x_s"],
-                            mode="markers",
-                            marker=dict(color="white", symbol="star", size=6),
+                            mode="lines",
+                            line=dict(color="white", width=6),
                             name="satellite motion",
                         )
                     )
