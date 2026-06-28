@@ -3,7 +3,7 @@ import lightkurve as lk
 import plotly.graph_objects as go
 import pandas as pd
 import matplotlib.pyplot as plt
-
+import numpy as np 
 
 # 1. Cache data
 
@@ -75,7 +75,7 @@ if submitted:
         st.error("Invalid Input. Make sure to fill in TIC ID and/or Sector.")
     else:  # render plots and output
         st.balloons()
-        st.write("### Output")
+        # st.write("### Output")
         st.write(f"**TIC:** {int(tic_id)} | **Sector:** {int(sector)}")
 
         # Call the functions to fetch the data
@@ -186,36 +186,46 @@ if submitted:
 
             if centroid_plot:
                 st.divider()
-                st.write("Centroid Plot should be here once construction is finished!")
-                st.write("Will fix some bugs soon!")
                 cs = get_centroid_data(tic_id, sector)
                 if cs is not None:
-                    st.write("test success!")
                     cxb = cs[0]
                     cxs = cs[1]
                     cyb = cs[2]
                     cys = cs[3]
 
+                    #I just found out that you need to normalize the data lol :0
+                    def normalize(data):
+                        return (data - np.min(data)) / (np.max(data) - np.min(data))
+
                     fig3 = go.Figure()
                     fig3.add_trace(
                         go.Scattergl(
                             x=cs[0]["time"],
-                            y=cs[0]["centroid_x_b"],
-                            mode="markers",
-                            marker=dict(color="orange", symbol="star", size=6),
-                            name="brightness",
+                            y=normalize(cs[0]["centroid_x_b"]),
+                            mode="lines",
+                            line=dict(color="orange", width=2),
+                            name="brightness motion",
                         )
                     )
 
                     fig3.add_trace(
                         go.Scattergl(
                             x=cs[1]["time"],
-                            y=cs[1]["centroid_x_s"],
+                            y=normalize(cs[1]["centroid_x_s"]),
                             mode="lines",
-                            line=dict(color="white", width=6),
+                            line=dict(color="white", width=2),
                             name="satellite motion",
                         )
                     )
+                    if transit_time != 0:
+                        fig3.add_vline(
+                            x=transit_time,
+                            line_dash="dash",
+                            line_color="darkorange",
+                            line_width=3,
+                            annotation_text="t0",
+                            annotation_position="top left",
+                        )
 
                     fig3.update_layout(
                         title=f"TIC {int(tic_id)} Centroid Plot (x-axis)",
@@ -226,6 +236,46 @@ if submitted:
                     )
 
                     st.plotly_chart(fig3, use_container_width=True)
+
+                    fig4 = go.Figure()
+                    fig4.add_trace(
+                        go.Scattergl(
+                            x=cs[2]["time"],
+                            y=normalize(cs[2]["centroid_y_b"]),
+                            mode="lines",
+                            line=dict(color="orange", width=2),
+                            name="brightness motion",
+                        )
+                    )
+
+                    fig4.add_trace(
+                        go.Scattergl(
+                            x=cs[3]["time"],
+                            y=normalize(cs[3]["centroid_y_s"]),
+                            mode="lines",
+                            line=dict(color="white", width=2),
+                            name="satellite motion",
+                        )
+                    )
+                    if transit_time != 0:
+                        fig4.add_vline(
+                            x=transit_time,
+                            line_dash="dash",
+                            line_color="darkorange",
+                            line_width=3,
+                            annotation_text="t0",
+                            annotation_position="top left",
+                        )
+
+                    fig4.update_layout(
+                        title=f"TIC {int(tic_id)} Centroid Plot (y-axis)",
+                        yaxis_title="Centroid Positions (y-axis)",
+                        xaxis_title="Time (BTJD)",
+                        template="plotly_dark",
+                        font=dict(size=18),
+                    )
+                    st.plotly_chart(fig4, use_container_width=True)
+
                 else:
                     st.write("debug it!")
 
