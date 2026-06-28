@@ -34,17 +34,23 @@ def get_centroid_data(tic_id, sector):
     if lc is None:
         return None
     lc = lc.normalize()
+    time = np.asarray(lc.time.value, dtype=np.float64)
+    mom_centr2 = np.asarray(lc.mom_centr2.value, dtype=np.float64)
+    mom_centr1 = np.asarray(lc.mom_centr1.value, dtype=np.float64)
+    pos_corr2 = np.asarray(lc.pos_corr2.value, dtype=np.float64)
+    pos_corr1 = np.asarray(lc.pos_corr1.value, dtype=np.float64)
+
     df_centroid_x_b = pd.DataFrame(
-        {"time": lc.time.value, "centroid_x_b": lc.mom_centr2.value}
+        {"time": time, "centroid_x_b": mom_centr2}
     )  # Centroid for x/brightness
     df_centroid_x_s = pd.DataFrame(
-        {"time": lc.time.value, "centroid_x_s": lc.pos_corr2.value}
+        {"time": time, "centroid_x_s": pos_corr2}
     )  # Centroid for x/satellite motion
     df_centroid_y_b = pd.DataFrame(
-        {"time": lc.time.value, "centroid_y_b": lc.mom_centr1.value}
+        {"time": time, "centroid_y_b": mom_centr1}
     )  # Centroid for y/brightness
     df_centroid_y_s = pd.DataFrame(
-        {"time": lc.time.value, "centroid_y_s": lc.pos_corr1.value}
+        {"time": time, "centroid_y_s": pos_corr1}
     )  # Centroid for y/satellite motion
     return (
         df_centroid_x_b.dropna(),
