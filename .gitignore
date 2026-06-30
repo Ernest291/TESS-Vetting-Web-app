@@ -10,4 +10,4 @@ wheels/
 .venv
 
 #files the i dont need
-test.py 
+/test.py 
