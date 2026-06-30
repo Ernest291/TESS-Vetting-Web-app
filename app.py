@@ -3,7 +3,7 @@ import lightkurve as lk
 import plotly.graph_objects as go
 import pandas as pd
 import matplotlib.pyplot as plt
-import numpy as np 
+import numpy as np
 
 # 1. Cache data
 
@@ -58,6 +58,17 @@ def get_centroid_data(tic_id, sector):
         df_centroid_y_b.dropna(),
         df_centroid_y_s.dropna(),
     )
+
+
+@st.cache_data(show_spinner="Preparing TPF Tests...")
+def get_tpf_data(tic_id, sector, t0):
+    tpf = lk.search_targetpixelfile(f"TIC {int(tic_id)}", sector=int(sector)).download()
+    if tpf is None:
+        return None
+    tpf_list = [tpf.flux.value]
+    t_list = [tpf.time.value]
+    t0_list = [t0]
+    return (tpf_list, t_list, t0_list)
 
 
 # 2. streamlit layout
@@ -199,7 +210,7 @@ if submitted:
                     cyb = cs[2]
                     cys = cs[3]
 
-                    #I just found out that you need to normalize the data lol :0
+                    # I just found out that you need to normalize the data lol :0
                     def normalize(data):
                         return (data - np.min(data)) / (np.max(data) - np.min(data))
 
@@ -290,3 +301,70 @@ if submitted:
             if in_out_transit_diff:
                 st.divider()
                 st.write("Work in Progress")
+                if transit_time != 0:
+                    tpfs = get_tpf_data(tic_id, sector, transit_time)
+
+                    # This particular snippet is made by Nora Eisner: https://github.com/noraeisner/PH_Coffee_Chat
+                    if tpfs is not None:
+                        tpflist = tpfs[0]  # tpf_list
+                        tlist = tpfs[1]  # t_list
+                        t0list = tpfs[2]  # t0_list
+
+                        fig = plt.figure(figsize=(9, 2.5 * len(t0list)))
+                        plt.tight_layout()
+
+                        count = 0
+
+                        for idx, tpf_filt in enumerate(tpflist):
+                            T0 = t0list[idx]
+                            t = tlist[idx]
+
+                            intr = (
+                                abs(T0 - t) < 0.25
+                            )  # Create a mask of the in-transit times
+                            ootr = (abs(T0 - t) < 0.5) * (
+                                abs(T0 - t) < 0.3
+                            )  # Create a mask of the out-of-transit times
+                            img_intr = tpf_filt[intr, :, :].sum(axis=0) / float(
+                                intr.sum()
+                            )  # Apply the masks and normalize the flux
+                            img_ootr = tpf_filt[ootr, :, :].sum(axis=0) / float(
+                                ootr.sum()
+                            )
+                            img_diff = (
+                                img_ootr - img_intr
+                            )  # Calculate the difference image
+
+                            count += 1
+                            plt.subplot(len(t0list), 3, count)
+                            plt.axis("off")
+                            plt.imshow(img_intr, cmap=plt.cm.viridis, origin="lower")
+                            plt.colorbar()
+                            plt.title(
+                                "t = {} days \n In Transit Flux (e-/cadence)".format(
+                                    T0
+                                ),
+                                fontsize=9,
+                            )
+
+                            count += 1
+                            plt.subplot(len(t0list), 3, count)
+                            plt.axis("off")
+                            plt.imshow(img_ootr, cmap=plt.cm.viridis, origin="lower")
+                            plt.colorbar()
+                            plt.title("Out of Transit Flux (e-/cadence)")
+
+                            count += 1
+                            plt.subplot(len(t0list), 3, count)
+                            plt.axis("off")
+                            plt.imshow(img_diff, cmap=plt.cm.viridis, origin="lower")
+                            plt.colorbar()
+                            plt.title("Difference Image Flux (e-/cadence)", fontsize=9)
+
+                        plt.subplots_adjust(wspace=0)
+                        plt.tight_layout()
+                        st.pyplot(fig)
+
+                        # ----------------------------End of Snippet------------------------------------------
+                else:
+                    st.write("Transit Time is needed to plot this!")
