@@ -68,7 +68,9 @@ def get_tpf_data(tic_id, sector, t0):
     tpf_list = [tpf.flux.value]
     t_list = [tpf.time.value]
     t0_list = [t0]
-    return (tpf_list, t_list, t0_list)
+    bkg_list = [np.nanmean(tpf.flux.value, axis=0)]
+    arrshape_list = [tpf.flux.shape]
+    return (tpf_list, t_list, t0_list, bkg_list, arrshape_list)
 
 
 # 2. streamlit layout
@@ -300,7 +302,11 @@ if submitted:
 
             if in_out_transit_diff:
                 st.divider()
-                st.write("Work in Progress")
+                st.subheader("In-Out Transit Difference Plot")
+                st.write(
+                    "This particular snippet is made by Nora Eisner: https://github.com/noraeisner/PH_Coffee_Chat"
+                )
+
                 if transit_time != 0:
                     tpfs = get_tpf_data(tic_id, sector, transit_time)
 
@@ -368,3 +374,192 @@ if submitted:
                         # ----------------------------End of Snippet------------------------------------------
                 else:
                     st.write("Transit Time is needed to plot this!")
+
+            # In-Out Transit difference -----------------------------------------------------------------------
+            if pixel_level:
+                st.divider()
+                st.subheader("Pixel-Level Plot")
+                st.write(
+                    "This particular snippet is made by Nora Eisner: https://github.com/noraeisner/PH_Coffee_Chat"
+                )
+                if transit_time != 0:
+                    tpf_pl = get_tpf_data(tic_id, sector, transit_time)
+                    if tpf_pl is not None:
+                        # This particular snippet is made by Nora Eisner: https://github.com/noraeisner/PH_Coffee_Chat
+                        tpf_pl_list = tpf_pl[0]  # tpf_list
+                        t_pl_list = tpf_pl[1]  # t_list
+                        t0_pl_list = tpf_pl[2]  # t0_list
+                        bkg_pl_list = tpf_pl[3]  # bkg_list
+                        arrshape_pl_list = tpf_pl[4]  # arrshape_list
+
+                        def rebin(arr, new_shape):
+                            """'
+                            function used to rebin the data
+                            """
+                            shape = (
+                                new_shape[0],
+                                arr.shape[0] // new_shape[0],
+                                new_shape[1],
+                                arr.shape[1] // new_shape[1],
+                            )
+                            return arr.reshape(shape).mean(-1).mean(1)
+
+                        for idx, X1_original in enumerate(tpf_pl_list):
+                            bkg = np.flip(bkg_pl_list[idx], axis=0)
+                            arrshape = arrshape_pl_list[idx]
+                            peak = t0_pl_list[idx]
+                            tpf = tpf_pl_list[idx]
+
+                            s = X1_original.shape
+                            X1 = X1_original.reshape(s[0], s[1] * s[2])
+
+                            T0 = t0_pl_list[idx]
+                            t = t_pl_list[idx]
+
+                            intr = abs(T0 - t) < 0.25
+                            ootr = (abs(T0 - t) < 0.5) * (abs(T0 - t) < 0.3)
+
+                            fig, ax = plt.subplots(
+                                arrshape[1],
+                                arrshape[2],
+                                sharex=True,
+                                sharey=False,
+                                gridspec_kw={"hspace": 0, "wspace": 0},
+                                figsize=(7.5, 7.5),
+                            )
+                            plt.tight_layout()
+
+                            try:
+                                color = plt.cm.viridis(
+                                    np.linspace(
+                                        0,
+                                        1,
+                                        int(np.nanmax(bkg)) - int(np.nanmin(bkg)) + 1,
+                                    )
+                                )
+                                simplebkg = False
+                            except:
+                                simplebkg = True
+
+                            for i in range(0, arrshape[1]):
+                                ii = arrshape[1] - 1 - i
+                                for j in range(0, arrshape[2]):
+                                    apmask = np.zeros(arrshape[1:], dtype=np.int64)
+                                    apmask[i, j] = 1
+                                    apmask = apmask.astype(bool)
+
+                                    flux = X1[:, apmask.flatten()].sum(axis=1)
+
+                                    m = np.nanmedian(flux[ootr])
+
+                                    normalizedflux = flux / m
+
+                                    f1 = normalizedflux
+                                    time = t
+
+                                    binfac = 7
+
+                                    N = len(time)
+                                    n = int(np.floor(N / binfac) * binfac)
+                                    X = np.zeros((2, n))
+                                    X[0, :] = time[:n]
+                                    X[1, :] = f1[:n]
+                                    Xb = rebin(X, (2, int(n / binfac)))
+
+                                    time_binned = np.array(Xb[0])
+                                    flux_binned = np.array(Xb[1])
+
+                                    timemask = (time_binned < peak + 1.5) & (
+                                        time_binned > peak - 1.5
+                                    )
+
+                                    time_binned = time_binned[timemask]
+                                    flux_binned = flux_binned[timemask]
+
+                                    p = np.poly1d(
+                                        np.polyfit(time_binned, flux_binned, 3)
+                                    )
+                                    flux_binned = flux_binned / p(time_binned)
+
+                                    intr = abs(peak - time_binned) < 0.1
+                                    # ----------
+
+                                    if simplebkg == True:
+                                        ax[ii, j].set_facecolor(color="k")
+                                        linecolor = "w"
+                                        transitcolor = "gold"
+                                    else:
+                                        ax[ii, j].set_facecolor(
+                                            color=color[
+                                                int(bkg[ii, j]) - int(np.nanmin(bkg))
+                                            ]
+                                        )
+
+                                        if (
+                                            int(bkg[ii, j]) - abs(int(np.nanmin(bkg)))
+                                            > (
+                                                (np.nanmax(bkg))
+                                                - abs(int(np.nanmin(bkg)))
+                                            )
+                                            / 2
+                                        ):
+                                            linecolor = "k"
+                                            transitcolor = "orangered"
+                                        else:
+                                            linecolor = "w"
+                                            transitcolor = "gold"
+
+                                    ax[ii, j].plot(
+                                        time_binned,
+                                        flux_binned,
+                                        color=linecolor,
+                                        marker=".",
+                                        markersize=1,
+                                        lw=0,
+                                    )
+                                    ax[ii, j].plot(
+                                        time_binned[intr],
+                                        flux_binned[intr],
+                                        color=transitcolor,
+                                        marker=".",
+                                        markersize=1,
+                                        lw=0,
+                                    )
+
+                                    # get rid of ticks and ticklabels
+                                    ax[ii, j].set_yticklabels([])
+                                    ax[ii, j].set_xticklabels([])
+                                    ax[ii, j].set_xticks([])
+                                    ax[ii, j].set_yticks([])
+
+                            # ------------------
+
+                            print("done.\n")
+                            # ------------------
+
+                            # label the pixels
+
+                            fig.text(
+                                0.5, 0.01, "column (pixel)", ha="center", fontsize=13
+                            )
+                            fig.text(
+                                0.01,
+                                0.5,
+                                "row (pixel)",
+                                va="center",
+                                rotation="vertical",
+                                fontsize=13,
+                            )
+
+                            # - - - - - - - - - -
+
+                            plt.subplots_adjust(
+                                top=0.95, right=0.99, bottom=0.04, left=0.04
+                            )
+
+                            plt.suptitle(
+                                r"T0 = {} $\pm$ 1.5 d".format(peak), y=0.98, fontsize=12
+                            )
+                            plt.xlim(peak - 1.5, peak + 1.5)
+                            st.pyplot(fig)
+                    # ------------------------End 0f Code----------------------------------------------------------------
